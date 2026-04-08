@@ -57,7 +57,7 @@ if "submitted_inputs" not in st.session_state:
 
 
 def load_css():
-    st.markdown("""
+    css = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -279,14 +279,9 @@ def load_css():
         margin-top: 0.6rem;
         margin-bottom: 0.85rem;
     }
-
-    hr {
-        border: none;
-        border-top: 1px solid rgba(255,255,255,0.08);
-        margin: 1rem 0;
-    }
     </style>
-    """, unsafe_allow_html=True)
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
 
 def get_weather(city: str) -> Optional[Dict[str, str]]:
@@ -349,10 +344,9 @@ def generate_outfit_reference_images(season: str, style: str, demographic: str, 
     ]
 
     refs = []
-    for q in queries:
-        encoded = urllib.parse.quote(q)
+    for i, q in enumerate(queries):
         refs.append({
-            "url": f"https://picsum.photos/seed/{encoded}/900/700",
+            "url": f"https://picsum.photos/seed/fashion{i+1}/900/700",
             "caption": q.title()
         })
     return refs
@@ -420,34 +414,37 @@ Rules:
 
 load_css()
 
-st.markdown("""
-<div class="main-shell">
-    <div class="hero-title">TrendWeave AI</div>
-    <div class="hero-subtitle">
-        Fashion design intelligence for generating outfit concepts using trend signals,
-        season, demographic preference, weather context, and production-aware material guidance.
+st.markdown(
+    """
+    <div class="main-shell">
+        <div class="hero-title">TrendWeave AI</div>
+        <div class="hero-subtitle">
+            Fashion design intelligence for generating outfit concepts using trend signals,
+            season, demographic preference, weather context, and production-aware material guidance.
+        </div>
     </div>
-</div>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title">Design Configuration</div>', unsafe_allow_html=True)
 
 with st.form("fashion_form"):
-    row1_col1, row1_col2, row1_col3 = st.columns(3, gap="medium")
-    with row1_col1:
+    c1, c2, c3 = st.columns(3, gap="medium")
+    with c1:
         demographic = st.selectbox("Target Demographic", ["Gen Z", "Working Professionals", "Teens", "Adults"])
-    with row1_col2:
+    with c2:
         gender = st.selectbox("Gender Segment", ["Women", "Men", "Unisex"])
-    with row1_col3:
+    with c3:
         season = st.selectbox("Season", ["Summer", "Winter", "Spring", "Autumn"])
 
-    row2_col1, row2_col2, row2_col3 = st.columns(3, gap="medium")
-    with row2_col1:
+    c4, c5, c6 = st.columns(3, gap="medium")
+    with c4:
         region = st.text_input("Region / City", "Coimbatore")
-    with row2_col2:
+    with c5:
         style = st.selectbox("Style Preference", ["Streetwear", "Minimal", "Casual", "Ethnic Fusion", "Formal"])
-    with row2_col3:
+    with c6:
         price_range = st.selectbox("Price Range", ["Budget", "Mid-range", "Premium"])
 
     generate = st.form_submit_button("Generate Fashion Design")
@@ -458,28 +455,37 @@ weather = get_weather(region)
 temp_text = f"{weather['temperature']}°C" if weather else "Unavailable"
 wind_text = f"{weather['wind_speed']} km/h" if weather else "Unavailable"
 
-metric1, metric2, metric3 = st.columns(3, gap="medium")
-with metric1:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">Selected Season</div>
-        <div class="metric-value">{season}</div>
-    </div>
-    """, unsafe_allow_html=True)
-with metric2:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">Temperature Context</div>
-        <div class="metric-value">{temp_text}</div>
-    </div>
-    """, unsafe_allow_html=True)
-with metric3:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">AI Mode</div>
-        <div class="metric-value">{'Groq Live' if GROQ_API_KEY else 'Demo'}</div>
-    </div>
-    """, unsafe_allow_html=True)
+m1, m2, m3 = st.columns(3, gap="medium")
+with m1:
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">Selected Season</div>
+            <div class="metric-value">{season}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+with m2:
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">Temperature Context</div>
+            <div class="metric-value">{temp_text}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+with m3:
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">AI Mode</div>
+            <div class="metric-value">{'Groq Live' if GROQ_API_KEY else 'Demo'}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 if generate:
     prompt_inputs = {
@@ -524,103 +530,120 @@ if st.session_state.generated and st.session_state.result:
 
     st.markdown("## Generated Output")
 
-    col1, col2 = st.columns(2, gap="medium")
+    left, right = st.columns(2, gap="medium")
 
-    with col1:
-        st.markdown(f"""
-        <div class="result-card">
-            <div class="design-title">{result.get("design_name", "N/A")}</div>
-            <div class="muted-text">{result.get("concept", "N/A")}</div>
-            <br>
-            <div class="info-item"><b>Target Demographic:</b> {result.get("target_demographic", "N/A")}</div>
-            <div class="info-item"><b>Size Recommendation:</b> {result.get("size_recommendation", "N/A")}</div>
-            <div class="info-item"><b>Region:</b> {submitted.get("region", "N/A")}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with left:
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="design-title">{result.get("design_name", "N/A")}</div>
+                <div class="muted-text">{result.get("concept", "N/A")}</div>
+                <br>
+                <div class="info-item"><b>Target Demographic:</b> {result.get("target_demographic", "N/A")}</div>
+                <div class="info-item"><b>Size Recommendation:</b> {result.get("size_recommendation", "N/A")}</div>
+                <div class="info-item"><b>Region:</b> {submitted.get("region", "N/A")}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    with col2:
+    with right:
         colors = result.get("colors", [])
         fabrics = result.get("fabrics", [])
         colors = colors if isinstance(colors, list) else [str(colors)]
         fabrics = fabrics if isinstance(fabrics, list) else [str(fabrics)]
 
-        color_badges = "".join([f'<span class="badge">{c}</span>' for c in colors])
-        fabric_badges = "".join([f'<span class="badge">{f}</span>' for f in fabrics])
+        color_badges = "".join(f'<span class="badge">{c}</span>' for c in colors)
+        fabric_badges = "".join(f'<span class="badge">{f}</span>' for f in fabrics)
 
-        st.markdown(f"""
-        <div class="result-card">
-            <div class="section-title">Materials & Production</div>
-            <div class="info-item"><b>Color Palette</b></div>
-            <div class="badge-wrap">{color_badges}</div>
-            <br>
-            <div class="info-item"><b>Fabric Suggestions</b></div>
-            <div class="badge-wrap">{fabric_badges}</div>
-            <br>
-            <div class="info-item"><b>Production Feasibility:</b> {result.get("production_feasibility", "N/A")}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Materials & Production</div>
+                <div class="info-item"><b>Color Palette</b></div>
+                <div class="badge-wrap">{color_badges}</div>
+                <br>
+                <div class="info-item"><b>Fabric Suggestions</b></div>
+                <div class="badge-wrap">{fabric_badges}</div>
+                <br>
+                <div class="info-item"><b>Production Feasibility:</b> {result.get("production_feasibility", "N/A")}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    sub1, sub2, sub3 = st.columns(3, gap="medium")
+    s1, s2, s3 = st.columns(3, gap="medium")
 
-    with sub1:
-        feature_badges = "".join([f'<span class="badge">{item}</span>' for item in result.get("suggested_features", [])])
-        st.markdown(f"""
-        <div class="result-card">
-            <div class="section-title">Suggested Features</div>
-            <div class="badge-wrap">{feature_badges}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with s1:
+        feature_badges = "".join(
+            f'<span class="badge">{item}</span>' for item in result.get("suggested_features", [])
+        )
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Suggested Features</div>
+                <div class="badge-wrap">{feature_badges}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    with sub2:
-        notes_html = "".join([f"<div class='info-item'>• {note}</div>" for note in result.get("style_notes", [])])
-        st.markdown(f"""
-        <div class="result-card">
-            <div class="section-title">Styling Notes</div>
-            {notes_html}
-        </div>
-        """, unsafe_allow_html=True)
+    with s2:
+        notes_html = "".join(
+            f"<div class='info-item'>• {note}</div>" for note in result.get("style_notes", [])
+        )
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Styling Notes</div>
+                {notes_html}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    with sub3:
-        st.markdown(f"""
-        <div class="result-card">
-            <div class="section-title">Weather Context</div>
-            <div class="info-item"><b>Season:</b> {submitted.get("season", "N/A")}</div>
-            <div class="info-item"><b>Temperature:</b> {submitted.get("temp_text", "N/A")}</div>
-            <div class="info-item"><b>Wind Speed:</b> {submitted.get("wind_text", "N/A")}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with s3:
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Weather Context</div>
+                <div class="info-item"><b>Season:</b> {submitted.get("season", "N/A")}</div>
+                <div class="info-item"><b>Temperature:</b> {submitted.get("temp_text", "N/A")}</div>
+                <div class="info-item"><b>Wind Speed:</b> {submitted.get("wind_text", "N/A")}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     st.markdown("## Reference Moodboard")
-    img1, img2, img3 = st.columns(3, gap="medium")
-    for col, item in zip([img1, img2, img3], refs):
+    i1, i2, i3 = st.columns(3, gap="medium")
+
+    for col, item in zip([i1, i2, i3], refs):
         with col:
             st.markdown('<div class="image-card">', unsafe_allow_html=True)
             st.image(item["url"], use_container_width=True)
-            st.markdown(f'<div class="image-caption">{item["caption"]}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="image-caption">{item["caption"]}</div>',
+                unsafe_allow_html=True
+            )
             st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("## System Status")
-    st.markdown(f"""
-    <div class="status-box">{result.get("debug_error", "No debug message")}</div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="status-box">{result.get("debug_error", "No debug message")}</div>
+        """,
+        unsafe_allow_html=True
+    )
 
 else:
     st.markdown("## Preview")
     p1, p2, p3 = st.columns(3, gap="medium")
 
     with p1:
-        st.markdown("""
-        <div class="preview-card">
-            <div class="preview-title">Trend-Aware Design</div>
-            <div class="preview-text">
-                Seasonal trends, demographic inputs, and style preferences are combined into a commercially realistic outfit concept.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with p2:
-        st.markdown("""
-        <div class="preview-card">
-            <div class="preview-title">Weather Context</div>
-            <div class="preview-text">
-                Regional wea
+        st.markdown(
+            """
+            <div class="preview-card">
+                <div class="preview-title">Trend-Aware Design</div>
+                <div class="preview-text">
+                    Seasonal trends, demogr
