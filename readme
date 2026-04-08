@@ -1,0 +1,11 @@
+# TrendWeave AI
+A simple AI-powered fashion design intelligence platform.
+this project uses groq ai api for ai integration
+It analyzes trends, demographics, season, and regional context.
+The system generates fashion design ideas with fabric suggestions.
+It also provides sizing recommendations and production feasibility insights.
+Users can explore designs through a clean and modern interface.
+The app includes reference images for visual inspiration.
+It is built using Python and Streamlit.
+## Live Link:
+(https://trendwave-ai-sfvdfbnuptju7vsn9udsjw.streamlit.app/)
