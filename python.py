@@ -5,7 +5,6 @@ from typing import Dict, List, Optional
 import requests
 import streamlit as st
 
-
 st.set_page_config(
     page_title="TrendWeave AI",
     page_icon="✨",
@@ -82,7 +81,9 @@ def init_state():
         "generated": False,
         "result": None,
         "refs": [],
-        "submitted_inputs": {}
+        "submitted_inputs": {},
+        "last_error": "",
+        "last_success": ""
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -126,9 +127,13 @@ def load_css():
             display: none;
         }
 
-        .main-shell {
-            background: rgba(255,255,255,0.04);
+        .main-shell, .section-card, .result-card, .preview-card, .metric-card, .image-card {
+            background: rgba(255,255,255,0.05);
             border: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(8px);
+        }
+
+        .main-shell {
             border-radius: 24px;
             padding: 2rem;
             margin-bottom: 1.5rem;
@@ -153,16 +158,12 @@ def load_css():
         }
 
         .section-card {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.08);
             border-radius: 20px;
             padding: 1.25rem;
             margin-bottom: 1rem;
         }
 
         .result-card {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.08);
             border-radius: 20px;
             padding: 1.35rem;
             height: 100%;
@@ -195,10 +196,6 @@ def load_css():
             margin-bottom: 0.35rem;
         }
 
-        .badge-wrap {
-            margin-top: 0.35rem;
-        }
-
         .badge {
             display: inline-block;
             padding: 0.42rem 0.8rem;
@@ -212,8 +209,6 @@ def load_css():
         }
 
         .metric-card {
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.07);
             border-radius: 18px;
             padding: 1rem;
             text-align: center;
@@ -233,8 +228,6 @@ def load_css():
         }
 
         .preview-card {
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
             border-radius: 18px;
             padding: 1.2rem;
             min-height: 170px;
@@ -255,8 +248,6 @@ def load_css():
         }
 
         .image-card {
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
             border-radius: 18px;
             padding: 0.8rem;
             height: 100%;
@@ -279,12 +270,6 @@ def load_css():
             font-size: 0.86rem;
             white-space: pre-wrap;
             word-break: break-word;
-        }
-
-        .small-note {
-            color: rgba(226,232,240,0.70);
-            font-size: 0.88rem;
-            margin-bottom: 0.75rem;
         }
 
         div[data-baseweb="input"] > div,
@@ -314,7 +299,6 @@ def load_css():
             border: none;
             background: #2563eb;
             color: #ffffff;
-            box-shadow: none;
         }
 
         .stButton > button:hover,
@@ -354,12 +338,9 @@ def get_weather(city: str) -> Optional[Dict[str, str]]:
         weather_res.raise_for_status()
 
         current = weather_res.json().get("current", {})
-        temperature = current.get("temperature_2m", "N/A")
-        wind_speed = current.get("wind_speed_10m", "N/A")
-
         return {
-            "temperature": safe_str(temperature),
-            "wind_speed": safe_str(wind_speed)
+            "temperature": safe_str(current.get("temperature_2m", "N/A")),
+            "wind_speed": safe_str(current.get("wind_speed_10m", "N/A"))
         }
     except Exception:
         return None
@@ -370,10 +351,10 @@ def demo_result(prompt_inputs: Dict[str, str]) -> Dict:
     style = prompt_inputs.get("style", "Streetwear")
     demographic = prompt_inputs.get("demographic", "Gen Z")
     gender = prompt_inputs.get("gender", "Unisex")
-    price_range = prompt_inputs.get("price_range", "Mid-range")
     region = prompt_inputs.get("region", "Coimbatore")
+    price_range = prompt_inputs.get("price_range", "Mid-range")
 
-    color_map = {
+    palette_map = {
         "Summer": ["Powder Blue", "Soft White", "Stone Beige"],
         "Winter": ["Olive Brown", "Charcoal", "Warm Sand"],
         "Spring": ["Mint Grey", "Soft Peach", "Cloud White"],
@@ -383,13 +364,13 @@ def demo_result(prompt_inputs: Dict[str, str]) -> Dict:
     return {
         "design_name": f"{season} {style} Edit",
         "concept": (
-            f"A {season.lower()}-ready {style.lower()} outfit concept tailored for "
-            f"{demographic.lower()} {gender.lower()} shoppers in {region}, balancing "
-            f"trend-forward styling, comfort, and {price_range.lower()} market realism."
+            f"A {season.lower()}-ready {style.lower()} outfit concept for "
+            f"{demographic.lower()} {gender.lower()} shoppers in {region}, "
+            f"balancing trend relevance, comfort, and {price_range.lower()} market practicality."
         ),
-        "colors": color_map.get(season, ["Powder Blue", "Soft White", "Stone Beige"]),
+        "colors": palette_map.get(season, ["Soft White", "Stone Beige", "Slate"]),
         "fabrics": FABRIC_GUIDE.get(season, ["Cotton", "Linen"])[:2],
-        "size_recommendation": SIZE_GUIDE.get(demographic, "S to XL with structured regular fits"),
+        "size_recommendation": SIZE_GUIDE.get(demographic, "S to XL with balanced fits"),
         "production_feasibility": "High feasibility with low-to-medium construction complexity and locally sourceable materials.",
         "target_demographic": f"{demographic} fashion shoppers",
         "suggested_features": FEATURE_SUGGESTIONS.get(season, FEATURE_SUGGESTIONS["Summer"]),
@@ -473,8 +454,7 @@ Rules:
         if response.status_code != 200:
             data = demo_result(prompt_inputs)
             try:
-                err = response.json()
-                data["system_status"] = f"Groq fallback triggered - HTTP {response.status_code}: {err}"
+                data["system_status"] = f"Groq fallback triggered - HTTP {response.status_code}: {response.json()}"
             except Exception:
                 data["system_status"] = f"Groq fallback triggered - HTTP {response.status_code}"
             return data
@@ -491,49 +471,42 @@ Rules:
 
 
 def generate_outfit_reference_images(season: str, style: str, demographic: str, gender: str) -> List[Dict[str, str]]:
-    queries = [
+    seeds = [
         f"{season.lower()}-{style.lower()}-{gender.lower()}-fashion",
-        f"{demographic.lower()}-fashion-inspiration",
-        f"editorial-{style.lower()}-full-body"
+        f"{demographic.lower()}-outfit-inspiration",
+        f"editorial-{style.lower()}-lookbook"
+    ]
+    return [
+        {
+            "url": f"https://picsum.photos/seed/{urllib.parse.quote(seed)}/900/700",
+            "caption": seed.replace("-", " ").title()
+        }
+        for seed in seeds
     ]
 
-    refs = []
-    for i, q in enumerate(queries, start=1):
-        refs.append({
-            "url": f"https://picsum.photos/seed/{urllib.parse.quote(q)}/900/700",
-            "caption": q.replace("-", " ").title()
-        })
-    return refs
+
+def metric_card(label: str, value: str):
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
-def render_metric_card(label: str, value: str):
-    html = """
-    <div class="metric-card">
-        <div class="metric-label">{label}</div>
-        <div class="metric-value">{value}</div>
-    </div>
-    """.format(label=label, value=value)
-    st.markdown(html, unsafe_allow_html=True)
-
-
-def render_preview_card(title: str, text: str):
-    html = """
-    <div class="preview-card">
-        <div class="preview-title">{title}</div>
-        <div class="preview-text">{text}</div>
-    </div>
-    """.format(title=title, text=text)
-    st.markdown(html, unsafe_allow_html=True)
-
-
-def render_result_card(title: str, body_html: str):
-    html = """
-    <div class="result-card">
-        <div class="section-title">{title}</div>
-        {body_html}
-    </div>
-    """.format(title=title, body_html=body_html)
-    st.markdown(html, unsafe_allow_html=True)
+def preview_card(title: str, text: str):
+    st.markdown(
+        f"""
+        <div class="preview-card">
+            <div class="preview-title">{title}</div>
+            <div class="preview-text">{text}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 init_state()
@@ -583,25 +556,29 @@ wind_text = f"{weather['wind_speed']} km/h" if weather else "Unavailable"
 
 m1, m2, m3 = st.columns(3, gap="medium")
 with m1:
-    render_metric_card("Selected Season", season)
+    metric_card("Selected Season", season)
 with m2:
-    render_metric_card("Temperature Context", temp_text)
+    metric_card("Temperature Context", temp_text)
 with m3:
-    render_metric_card("AI Mode", "Groq Live" if GROQ_API_KEY else "Demo")
+    metric_card("AI Mode", "Groq Live" if GROQ_API_KEY else "Demo")
 
 if generate:
-    prompt_inputs = {
-        "demographic": demographic,
-        "gender": gender,
-        "season": season,
-        "region": clean_region,
-        "style": style,
-        "price_range": price_range,
-        "temp_text": temp_text,
-        "wind_text": wind_text
-    }
+    st.session_state.last_error = ""
+    st.session_state.last_success = ""
 
-    prompt = f"""
+    try:
+        prompt_inputs = {
+            "demographic": demographic,
+            "gender": gender,
+            "season": season,
+            "region": clean_region,
+            "style": style,
+            "price_range": price_range,
+            "temp_text": temp_text,
+            "wind_text": wind_text
+        }
+
+        prompt = f"""
 Create an original fashion outfit design for the following input.
 Season: {season}
 Style: {style}
@@ -617,6 +594,161 @@ Wind speed: {wind_text}
 Need: one commercially realistic outfit concept suitable for a fashion design ideation tool.
 """
 
-    with st.spinner("Generating fashion concept..."):
-        result = generate_design(prompt, prompt_inputs)
-       
+        with st.spinner("Generating fashion concept..."):
+            result = generate_design(prompt, prompt_inputs)
+            refs = generate_outfit_reference_images(season, style, demographic, gender)
+
+        st.session_state.generated = True
+        st.session_state.result = result
+        st.session_state.refs = refs
+        st.session_state.submitted_inputs = prompt_inputs
+        st.session_state.last_success = "Design generated successfully."
+
+    except Exception as e:
+        st.session_state.generated = False
+        st.session_state.result = None
+        st.session_state.refs = []
+        st.session_state.submitted_inputs = {}
+        st.session_state.last_error = f"Generation failed: {str(e)}"
+
+if st.session_state.last_success:
+    st.success(st.session_state.last_success)
+
+if st.session_state.last_error:
+    st.error(st.session_state.last_error)
+
+if st.session_state.generated and st.session_state.result:
+    result = st.session_state.result
+    refs = st.session_state.refs
+    submitted = st.session_state.submitted_inputs
+
+    st.markdown("## Generated Output")
+
+    left, right = st.columns(2, gap="medium")
+
+    with left:
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="design-title">{safe_str(result.get("design_name"))}</div>
+                <div class="muted-text">{safe_str(result.get("concept"))}</div>
+                <br>
+                <div class="info-item"><b>Target Demographic:</b> {safe_str(result.get("target_demographic"))}</div>
+                <div class="info-item"><b>Size Recommendation:</b> {safe_str(result.get("size_recommendation"))}</div>
+                <div class="info-item"><b>Region:</b> {safe_str(submitted.get("region"))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with right:
+        colors = result.get("colors", [])
+        fabrics = result.get("fabrics", [])
+
+        if not isinstance(colors, list):
+            colors = [safe_str(colors)]
+        if not isinstance(fabrics, list):
+            fabrics = [safe_str(fabrics)]
+
+        color_badges = "".join(f'<span class="badge">{safe_str(c)}</span>' for c in colors)
+        fabric_badges = "".join(f'<span class="badge">{safe_str(f)}</span>' for f in fabrics)
+
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Materials & Production</div>
+                <div class="info-item"><b>Color Palette</b></div>
+                <div>{color_badges}</div>
+                <br>
+                <div class="info-item"><b>Fabric Suggestions</b></div>
+                <div>{fabric_badges}</div>
+                <br>
+                <div class="info-item"><b>Production Feasibility:</b> {safe_str(result.get("production_feasibility"))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    s1, s2, s3 = st.columns(3, gap="medium")
+
+    with s1:
+        feature_badges = "".join(
+            f'<span class="badge">{safe_str(item)}</span>'
+            for item in result.get("suggested_features", [])
+        )
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Suggested Features</div>
+                <div>{feature_badges}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with s2:
+        notes_html = "".join(
+            f"<div class='info-item'>• {safe_str(note)}</div>"
+            for note in result.get("style_notes", [])
+        )
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Styling Notes</div>
+                {notes_html}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with s3:
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Weather Context</div>
+                <div class="info-item"><b>Season:</b> {safe_str(submitted.get("season"))}</div>
+                <div class="info-item"><b>Temperature:</b> {safe_str(submitted.get("temp_text"))}</div>
+                <div class="info-item"><b>Wind Speed:</b> {safe_str(submitted.get("wind_text"))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown("## Reference Moodboard")
+    i1, i2, i3 = st.columns(3, gap="medium")
+
+    for col, item in zip([i1, i2, i3], refs):
+        with col:
+            st.markdown('<div class="image-card">', unsafe_allow_html=True)
+            st.image(item["url"], use_container_width=True)
+            st.markdown(
+                f'<div class="image-caption">{safe_str(item["caption"])}</div>',
+                unsafe_allow_html=True
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("## System Status")
+    st.markdown(
+        f'<div class="status-box">{safe_str(result.get("system_status", "No status message"))}</div>',
+        unsafe_allow_html=True
+    )
+
+else:
+    st.markdown("## Preview")
+    p1, p2, p3 = st.columns(3, gap="medium")
+
+    with p1:
+        preview_card(
+            "Trend-Aware Design",
+            "Seasonal trends, target demographic, and style preference are combined to generate outfit concepts that feel current, wearable, and commercially realistic."
+        )
+    with p2:
+        preview_card(
+            "Weather Context",
+            "Regional weather information helps shape fabric choices, comfort direction, and practical styling suggestions for more relevant design output."
+        )
+    with p3:
+        preview_card(
+            "Production Guidance",
+            "The app suggests feasible materials, fit ranges, and realistic fashion product features so the output stays useful for ideation, demos, and early planning."
+        )
