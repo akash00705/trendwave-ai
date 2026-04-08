@@ -93,22 +93,6 @@ def load_css():
         line-height: 1.75;
     }
 
-    .pill-wrap {
-        margin-bottom: 1rem;
-    }
-
-    .pill {
-        display: inline-block;
-        padding: 0.42rem 0.88rem;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.10);
-        color: #dbeafe;
-        font-size: 0.82rem;
-        font-weight: 600;
-        margin: 0.22rem;
-    }
-
     .clean-card {
         background: rgba(255,255,255,0.05);
         border: 1px solid rgba(255,255,255,0.10);
@@ -225,18 +209,6 @@ def load_css():
         text-align: center;
     }
 
-    .debug-box {
-        background: rgba(15, 23, 42, 0.72);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 16px;
-        padding: 1rem;
-        color: #cbd5e1;
-        font-family: monospace;
-        font-size: 0.86rem;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
-
     div[data-baseweb="input"] > div,
     div[data-baseweb="select"] > div,
     .stTextInput > div > div,
@@ -338,8 +310,7 @@ def demo_result():
         "fabrics": ["Cotton Poplin", "Linen Blend"],
         "size_recommendation": "XS to L with relaxed oversized fit",
         "production_feasibility": "High feasibility with low-to-medium stitching complexity and easy local sourcing",
-        "target_demographic": "Gen Z urban fashion shoppers",
-        "debug_error": "Demo mode active"
+        "target_demographic": "Gen Z urban fashion shoppers"
     }
 
 def generate_reference_images(season, style, demographic):
@@ -395,37 +366,25 @@ Return only valid JSON in this exact format:
         result = response.json()
 
         if response.status_code != 200:
-            data = demo_result()
-            data["debug_error"] = f"HTTP {response.status_code}: {result}"
-            return data
+            return demo_result()
 
         content = result["choices"][0]["message"]["content"]
         parsed = extract_json_from_response(content)
 
         if parsed:
-            parsed["debug_error"] = "Success"
             return parsed
 
         data = demo_result()
         data["concept"] = content
-        data["debug_error"] = "Model returned non-JSON content"
         return data
 
-    except Exception as e:
-        data = demo_result()
-        data["debug_error"] = str(e)
-        return data
+    except Exception:
+        return demo_result()
 
 load_css()
 
 st.markdown("""
 <div class="hero-card">
-    <div class="pill-wrap">
-        <span class="pill">AI Fashion Intelligence</span>
-        <span class="pill">Clean Main Layout</span>
-        <span class="pill">Reference Moodboard</span>
-        <span class="pill">Hackathon Ready</span>
-    </div>
     <div class="hero-title">TrendWeave AI</div>
     <div class="hero-sub">
         A clean fashion design intelligence platform that transforms trends, demographics, regional context,
@@ -584,11 +543,6 @@ Wind speed: {wind_text}
             st.image(item["url"], use_container_width=True)
             st.markdown(f'<div class="image-caption">{item["caption"]}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown("## System Status")
-    st.markdown('<div class="clean-card">', unsafe_allow_html=True)
-    st.markdown(f'<div class="debug-box">{result.get("debug_error", "No debug message")}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 else:
     pv1, pv2, pv3 = st.columns(3, gap="large")
