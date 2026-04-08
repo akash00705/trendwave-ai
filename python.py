@@ -167,7 +167,6 @@ def load_css():
             border-radius: 20px;
             padding: 1.35rem;
             height: 100%;
-            margin-bottom: 1rem;
         }
 
         .section-title {
@@ -184,13 +183,6 @@ def load_css():
             margin-bottom: 0.75rem;
         }
 
-        .subsection-title {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 0.9rem;
-        }
-
         .muted-text {
             color: rgba(226,232,240,0.80);
             line-height: 1.75;
@@ -201,18 +193,6 @@ def load_css():
             color: rgba(226,232,240,0.84);
             line-height: 1.8;
             font-size: 0.95rem;
-            margin-bottom: 0.8rem;
-        }
-
-        .label {
-            color: #ffffff;
-            font-weight: 700;
-            display: block;
-            margin-bottom: 0.3rem;
-        }
-
-        .badge-wrap {
-            margin-top: 0.35rem;
             margin-bottom: 0.35rem;
         }
 
@@ -271,7 +251,6 @@ def load_css():
             border-radius: 18px;
             padding: 0.8rem;
             height: 100%;
-            margin-bottom: 1rem;
         }
 
         .image-caption {
@@ -291,17 +270,6 @@ def load_css():
             font-size: 0.86rem;
             white-space: pre-wrap;
             word-break: break-word;
-        }
-
-        .bullet-list {
-            margin: 0;
-            padding-left: 1rem;
-            color: rgba(226,232,240,0.84);
-        }
-
-        .bullet-list li {
-            margin-bottom: 0.45rem;
-            line-height: 1.7;
         }
 
         div[data-baseweb="input"] > div,
@@ -342,10 +310,6 @@ def load_css():
             color: #ffffff;
             margin-top: 0.6rem;
             margin-bottom: 0.85rem;
-        }
-
-        .output-spacer {
-            height: 0.2rem;
         }
         </style>
         """,
@@ -545,26 +509,6 @@ def preview_card(title: str, text: str):
     )
 
 
-def badge_row(items: List[str]):
-    badges = "".join([f'<span class="badge">{safe_str(item)}</span>' for item in items])
-    st.markdown(f'<div class="badge-wrap">{badges}</div>', unsafe_allow_html=True)
-
-
-def render_list_card(title: str, items: List[str]):
-    html_items = "".join([f"<li>{safe_str(item)}</li>" for item in items])
-    st.markdown(
-        f"""
-        <div class="result-card">
-            <div class="subsection-title">{title}</div>
-            <ul class="bullet-list">
-                {html_items}
-            </ul>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
 init_state()
 load_css()
 
@@ -639,4 +583,41 @@ Create an original fashion outfit design for the following input.
 Season: {season}
 Style: {style}
 Gender segment: {gender}
-Target demogra
+Target demographic: {demographic}
+Region: {clean_region}
+Trend keywords: {', '.join(TREND_DATA[season])}
+Suggested fabrics: {', '.join(FABRIC_GUIDE[season])}
+Suggested sizes: {SIZE_GUIDE[demographic]}
+Price range: {price_range}
+Current weather: {temp_text}
+Wind speed: {wind_text}
+Need: one commercially realistic outfit concept suitable for a fashion design ideation tool.
+"""
+
+        with st.spinner("Generating fashion concept..."):
+            result = generate_design(prompt, prompt_inputs)
+            refs = generate_outfit_reference_images(season, style, demographic, gender)
+
+        st.session_state.generated = True
+        st.session_state.result = result
+        st.session_state.refs = refs
+        st.session_state.submitted_inputs = prompt_inputs
+        st.session_state.last_success = "Design generated successfully."
+
+    except Exception as e:
+        st.session_state.generated = False
+        st.session_state.result = None
+        st.session_state.refs = []
+        st.session_state.submitted_inputs = {}
+        st.session_state.last_error = f"Generation failed: {str(e)}"
+
+if st.session_state.last_success:
+    st.success(st.session_state.last_success)
+
+if st.session_state.last_error:
+    st.error(st.session_state.last_error)
+
+if st.session_state.generated and st.session_state.result:
+    result = st.session_state.result
+    refs = st.session_state.refs
+    submitt
