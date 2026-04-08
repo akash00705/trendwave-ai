@@ -127,13 +127,16 @@ def load_css():
             display: none;
         }
 
-        .main-shell {
-            background: rgba(255,255,255,0.04);
+        .main-shell, .section-card, .result-card, .preview-card, .metric-card, .image-card {
+            background: rgba(255,255,255,0.05);
             border: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(8px);
+        }
+
+        .main-shell {
             border-radius: 24px;
             padding: 2rem;
             margin-bottom: 1.5rem;
-            backdrop-filter: blur(8px);
         }
 
         .hero-title {
@@ -154,16 +157,6 @@ def load_css():
             line-height: 1.7;
         }
 
-        .section-card,
-        .result-card,
-        .preview-card,
-        .metric-card,
-        .image-card {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.08);
-            backdrop-filter: blur(8px);
-        }
-
         .section-card {
             border-radius: 20px;
             padding: 1.25rem;
@@ -172,20 +165,9 @@ def load_css():
 
         .result-card {
             border-radius: 20px;
-            padding: 1.25rem;
-            min-height: 280px;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            overflow: hidden;
-        }
-
-        .result-card.tall {
-            min-height: 320px;
-        }
-
-        .result-card.compact {
-            min-height: 250px;
+            padding: 1.35rem;
+            height: 100%;
+            margin-bottom: 1rem;
         }
 
         .section-title {
@@ -196,32 +178,42 @@ def load_css():
         }
 
         .design-title {
-            font-size: 1.35rem;
+            font-size: 1.4rem;
             font-weight: 800;
             color: #ffffff;
             margin-bottom: 0.75rem;
-            line-height: 1.35;
+        }
+
+        .subsection-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 0.9rem;
         }
 
         .muted-text {
             color: rgba(226,232,240,0.80);
-            line-height: 1.72;
-            font-size: 0.96rem;
+            line-height: 1.75;
+            font-size: 0.97rem;
         }
 
         .info-item {
             color: rgba(226,232,240,0.84);
-            line-height: 1.75;
+            line-height: 1.8;
             font-size: 0.95rem;
-            margin-bottom: 0.45rem;
-            word-wrap: break-word;
+            margin-bottom: 0.8rem;
         }
 
-        .badge-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.45rem;
-            align-items: flex-start;
+        .label {
+            color: #ffffff;
+            font-weight: 700;
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+
+        .badge-wrap {
+            margin-top: 0.35rem;
+            margin-bottom: 0.35rem;
         }
 
         .badge {
@@ -233,19 +225,14 @@ def load_css():
             color: #e2e8f0;
             font-size: 0.82rem;
             font-weight: 600;
-            max-width: 100%;
-            white-space: normal;
-            word-break: break-word;
+            margin: 0.2rem 0.28rem 0.2rem 0;
         }
 
         .metric-card {
             border-radius: 18px;
             padding: 1rem;
             text-align: center;
-            min-height: 96px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+            height: 100%;
         }
 
         .metric-label {
@@ -263,7 +250,7 @@ def load_css():
         .preview-card {
             border-radius: 18px;
             padding: 1.2rem;
-            min-height: 180px;
+            min-height: 170px;
             height: 100%;
         }
 
@@ -284,6 +271,7 @@ def load_css():
             border-radius: 18px;
             padding: 0.8rem;
             height: 100%;
+            margin-bottom: 1rem;
         }
 
         .image-caption {
@@ -291,13 +279,29 @@ def load_css():
             text-align: center;
             font-size: 0.88rem;
             margin-top: 0.75rem;
-            line-height: 1.5;
         }
 
-        .small-note {
-            color: rgba(226,232,240,0.70);
-            font-size: 0.88rem;
-            margin-bottom: 0.75rem;
+        .status-box {
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 1rem;
+            color: #cbd5e1;
+            font-family: monospace;
+            font-size: 0.86rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .bullet-list {
+            margin: 0;
+            padding-left: 1rem;
+            color: rgba(226,232,240,0.84);
+        }
+
+        .bullet-list li {
+            margin-bottom: 0.45rem;
+            line-height: 1.7;
         }
 
         div[data-baseweb="input"] > div,
@@ -340,20 +344,8 @@ def load_css():
             margin-bottom: 0.85rem;
         }
 
-        [data-testid="column"] {
-            align-self: stretch !important;
-        }
-
-        [data-testid="column"] > div {
-            height: 100%;
-        }
-
-        @media (max-width: 900px) {
-            .result-card,
-            .result-card.tall,
-            .result-card.compact {
-                min-height: auto;
-            }
+        .output-spacer {
+            height: 0.2rem;
         }
         </style>
         """,
@@ -418,7 +410,8 @@ def demo_result(prompt_inputs: Dict[str, str]) -> Dict:
         "production_feasibility": "High feasibility with low-to-medium construction complexity and locally sourceable materials.",
         "target_demographic": f"{demographic} fashion shoppers",
         "suggested_features": FEATURE_SUGGESTIONS.get(season, FEATURE_SUGGESTIONS["Summer"]),
-        "style_notes": STYLE_GUIDE.get(style, STYLE_GUIDE["Casual"])
+        "style_notes": STYLE_GUIDE.get(style, STYLE_GUIDE["Casual"]),
+        "system_status": "Demo mode active - add GROQ_API_KEY in Streamlit secrets to enable live AI generation."
     }
 
 
@@ -434,7 +427,8 @@ def normalize_ai_result(parsed: Dict, prompt_inputs: Dict[str, str]) -> Dict:
         "production_feasibility": parsed.get("production_feasibility", fallback["production_feasibility"]),
         "target_demographic": parsed.get("target_demographic", fallback["target_demographic"]),
         "suggested_features": parsed.get("suggested_features", fallback["suggested_features"]),
-        "style_notes": parsed.get("style_notes", fallback["style_notes"])
+        "style_notes": parsed.get("style_notes", fallback["style_notes"]),
+        "system_status": "Success - Groq JSON mode"
     }
 
     for key in ["colors", "fabrics", "suggested_features", "style_notes"]:
@@ -494,15 +488,22 @@ Rules:
         response = requests.post(api_url, headers=headers, json=payload, timeout=60)
 
         if response.status_code != 200:
-            return demo_result(prompt_inputs)
+            data = demo_result(prompt_inputs)
+            try:
+                data["system_status"] = f"Groq fallback triggered - HTTP {response.status_code}: {response.json()}"
+            except Exception:
+                data["system_status"] = f"Groq fallback triggered - HTTP {response.status_code}"
+            return data
 
         result = response.json()
         content = result["choices"][0]["message"]["content"]
         parsed = json.loads(content)
         return normalize_ai_result(parsed, prompt_inputs)
 
-    except Exception:
-        return demo_result(prompt_inputs)
+    except Exception as e:
+        data = demo_result(prompt_inputs)
+        data["system_status"] = f"Groq fallback triggered: {str(e)}"
+        return data
 
 
 def generate_outfit_reference_images(season: str, style: str, demographic: str, gender: str) -> List[Dict[str, str]]:
@@ -544,8 +545,24 @@ def preview_card(title: str, text: str):
     )
 
 
-def badge_html(items):
-    return "".join(f'<span class="badge">{safe_str(item)}</span>' for item in items)
+def badge_row(items: List[str]):
+    badges = "".join([f'<span class="badge">{safe_str(item)}</span>' for item in items])
+    st.markdown(f'<div class="badge-wrap">{badges}</div>', unsafe_allow_html=True)
+
+
+def render_list_card(title: str, items: List[str]):
+    html_items = "".join([f"<li>{safe_str(item)}</li>" for item in items])
+    st.markdown(
+        f"""
+        <div class="result-card">
+            <div class="subsection-title">{title}</div>
+            <ul class="bullet-list">
+                {html_items}
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 init_state()
@@ -622,25 +639,4 @@ Create an original fashion outfit design for the following input.
 Season: {season}
 Style: {style}
 Gender segment: {gender}
-Target demographic: {demographic}
-Region: {clean_region}
-Trend keywords: {', '.join(TREND_DATA[season])}
-Suggested fabrics: {', '.join(FABRIC_GUIDE[season])}
-Suggested sizes: {SIZE_GUIDE[demographic]}
-Price range: {price_range}
-Current weather: {temp_text}
-Wind speed: {wind_text}
-Need: one commercially realistic outfit concept suitable for a fashion design ideation tool.
-"""
-
-        with st.spinner("Generating fashion concept..."):
-            result = generate_design(prompt, prompt_inputs)
-            refs = generate_outfit_reference_images(season, style, demographic, gender)
-
-        st.session_state.generated = True
-        st.session_state.result = result
-        st.session_state.refs = refs
-        st.session_state.submitted_inputs = prompt_inputs
-        st.session_state.last_success = "Design generated successfully."
-
-    except
+Target demogra
