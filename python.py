@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import json
 import urllib.parse
+from typing import Dict, List, Optional
 
 st.set_page_config(
     page_title="TrendWeave AI",
@@ -9,15 +10,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-
-if "generated_result" not in st.session_state:
-    st.session_state.generated_result = None
-
-if "generated_refs" not in st.session_state:
-    st.session_state.generated_refs = None
-
-if "last_generated" not in st.session_state:
-    st.session_state.last_generated = False
 
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -47,6 +39,23 @@ FABRIC_GUIDE = {
     "Autumn": ["Knit Fabric", "Twill", "Poly-Cotton Blend"]
 }
 
+FEATURE_SUGGESTIONS = {
+    "Summer": ["Moisture-friendly fabric finish", "Breathable inner construction", "Easy day-to-night styling"],
+    "Winter": ["Thermal comfort layering", "Structured silhouette retention", "Functional outerwear detailing"],
+    "Spring": ["Transitional layering flexibility", "Soft movement in fabric", "Fresh color contrast styling"],
+    "Autumn": ["Texture-led styling", "Mid-weather adaptability", "Utility-inspired pocket details"]
+}
+
+if "generated" not in st.session_state:
+    st.session_state.generated = False
+if "result" not in st.session_state:
+    st.session_state.result = None
+if "refs" not in st.session_state:
+    st.session_state.refs = []
+if "submitted_inputs" not in st.session_state:
+    st.session_state.submitted_inputs = {}
+
+
 def load_css():
     st.markdown("""
     <style>
@@ -58,8 +67,8 @@ def load_css():
 
     .stApp {
         background:
-            radial-gradient(circle at top center, rgba(99, 102, 241, 0.16), transparent 26%),
-            radial-gradient(circle at left top, rgba(56, 189, 248, 0.10), transparent 20%),
+            radial-gradient(circle at top center, rgba(99, 102, 241, 0.14), transparent 24%),
+            radial-gradient(circle at left top, rgba(56, 189, 248, 0.08), transparent 18%),
             linear-gradient(135deg, #0b1120 0%, #111827 45%, #0f172a 100%);
         color: #f8fafc;
     }
@@ -70,19 +79,20 @@ def load_css():
         padding-bottom: 2rem;
     }
 
-    section[data-testid="stSidebar"] {
-        display: none;
+    section[data-testid="stSidebar"] { display: none; }
+
+    .hero-card, .clean-card, .feature-card, .image-card {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.10);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        box-shadow: 0 12px 32px rgba(2, 6, 23, 0.24);
     }
 
     .hero-card {
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.10);
         border-radius: 28px;
         padding: 2rem;
         text-align: center;
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        box-shadow: 0 12px 32px rgba(2, 6, 23, 0.30);
         margin-bottom: 1.25rem;
     }
 
@@ -102,11 +112,7 @@ def load_css():
         line-height: 1.75;
     }
 
-    .pill-wrap {
-        margin-bottom: 1rem;
-    }
-
-    .pill {
+    .pill, .badge {
         display: inline-block;
         padding: 0.42rem 0.88rem;
         border-radius: 999px;
@@ -118,55 +124,20 @@ def load_css():
         margin: 0.22rem;
     }
 
-    .clean-card {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.10);
+    .clean-card, .feature-card, .image-card {
         border-radius: 22px;
-        padding: 1.2rem;
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        box-shadow: 0 8px 24px rgba(2, 6, 23, 0.24);
+        padding: 1.15rem;
         margin-bottom: 1rem;
     }
 
-    .feature-card {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 22px;
-        padding: 1.1rem;
-        min-height: 130px;
-        text-align: center;
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-    }
-
-    .feature-title {
-        color: #ffffff;
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: 0.4rem;
-    }
-
-    .feature-desc {
-        color: rgba(226,232,240,0.76);
-        font-size: 0.92rem;
-        line-height: 1.55;
-    }
-
-    .section-title {
-        text-align: center;
-        color: #ffffff;
-        font-size: 1.08rem;
-        font-weight: 700;
-        margin-bottom: 0.9rem;
-    }
-
-    .sub-title {
-        color: #ffffff;
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: 0.65rem;
-    }
+    .feature-card { min-height: 130px; text-align: center; }
+    .feature-title, .section-title, .sub-title, .result-title { color: #fff; }
+    .feature-title, .section-title, .sub-title { font-weight: 700; }
+    .feature-desc, .result-text, .info-line, .image-caption { color: rgba(226,232,240,0.84); }
+    .result-title { font-size: 1.28rem; font-weight: 800; margin-bottom: 0.65rem; }
+    .result-text, .info-line { line-height: 1.72; }
+    .section-title { text-align: center; font-size: 1.08rem; margin-bottom: 0.9rem; }
+    .sub-title { font-size: 1rem; margin-bottom: 0.65rem; }
 
     .metric-box {
         background: rgba(255,255,255,0.04);
@@ -176,63 +147,11 @@ def load_css():
         text-align: center;
     }
 
-    .metric-label {
-        color: rgba(226,232,240,0.68);
-        font-size: 0.8rem;
-        margin-bottom: 0.32rem;
-    }
+    .metric-label { color: rgba(226,232,240,0.68); font-size: 0.8rem; margin-bottom: 0.32rem; }
+    .metric-value { color: #ffffff; font-size: 1rem; font-weight: 700; }
 
-    .metric-value {
-        color: #ffffff;
-        font-size: 1rem;
-        font-weight: 700;
-    }
-
-    .badge {
-        display: inline-block;
-        padding: 0.42rem 0.78rem;
-        margin: 0.2rem;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.10);
-        color: #f8fafc;
-        font-size: 0.82rem;
-    }
-
-    .result-title {
-        color: #ffffff;
-        font-size: 1.28rem;
-        font-weight: 800;
-        margin-bottom: 0.65rem;
-    }
-
-    .result-text {
-        color: rgba(226,232,240,0.86);
-        font-size: 0.96rem;
-        line-height: 1.72;
-    }
-
-    .info-line {
-        color: #e2e8f0;
-        font-size: 0.95rem;
-        line-height: 1.75;
-    }
-
-    .image-card {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 22px;
-        overflow: hidden;
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-    }
-
-    .image-caption {
-        padding: 0.85rem 1rem 1rem 1rem;
-        color: #e2e8f0;
-        font-size: 0.9rem;
-        text-align: center;
-    }
+    .image-card { overflow: hidden; padding: 0; }
+    .image-caption { padding: 0.85rem 1rem 1rem 1rem; font-size: 0.9rem; text-align: center; }
 
     .debug-box {
         background: rgba(15, 23, 42, 0.72);
@@ -263,16 +182,6 @@ def load_css():
         font-size: 15px !important;
     }
 
-    input::placeholder, textarea::placeholder {
-        color: rgba(226,232,240,0.45) !important;
-        -webkit-text-fill-color: rgba(226,232,240,0.45) !important;
-    }
-
-    .stTextInput label, .stSelectbox label {
-        color: #dbe4f0 !important;
-        font-weight: 600 !important;
-    }
-
     .stButton > button,
     .stFormSubmitButton > button {
         width: 100%;
@@ -285,39 +194,26 @@ def load_css():
         color: #ffffff;
         box-shadow: 0 12px 30px rgba(37, 99, 235, 0.28);
     }
-
-    label, p, span, div {
-        color: #e2e8f0;
-    }
-
-    @media (max-width: 900px) {
-        .hero-title {
-            font-size: 2.15rem;
-        }
-    }
     </style>
     """, unsafe_allow_html=True)
 
-def get_weather(city):
+
+def get_weather(city: str) -> Optional[Dict[str, str]]:
     try:
         geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1"
         geo_res = requests.get(geo_url, timeout=20)
         geo_data = geo_res.json()
-
         if "results" not in geo_data:
             return None
 
         lat = geo_data["results"][0]["latitude"]
         lon = geo_data["results"][0]["longitude"]
-
         weather_url = (
             f"https://api.open-meteo.com/v1/forecast?"
             f"latitude={lat}&longitude={lon}&current=temperature_2m,wind_speed_10m"
         )
         weather_res = requests.get(weather_url, timeout=20)
-        weather_data = weather_res.json()
-        current = weather_data.get("current", {})
-
+        current = weather_res.json().get("current", {})
         return {
             "temperature": current.get("temperature_2m", "N/A"),
             "wind_speed": current.get("wind_speed_10m", "N/A")
@@ -325,43 +221,48 @@ def get_weather(city):
     except Exception:
         return None
 
-def demo_result():
+
+def demo_result(prompt_inputs: Dict[str, str]) -> Dict:
+    season = prompt_inputs.get("season", "Summer")
+    style = prompt_inputs.get("style", "Streetwear")
+    demographic = prompt_inputs.get("demographic", "Gen Z")
     return {
-        "design_name": "Urban Breeze Co-ord Set",
-        "concept": "A premium summer streetwear co-ord set for Gen Z with oversized comfort, breathable tailoring, pastel layering, and social-ready styling.",
-        "colors": ["Powder Blue", "Soft White", "Sand Beige"],
-        "fabrics": ["Cotton Poplin", "Linen Blend"],
-        "size_recommendation": "XS to L with relaxed oversized fit",
-        "production_feasibility": "High feasibility with low-to-medium stitching complexity and easy local sourcing",
-        "target_demographic": "Gen Z urban fashion shoppers",
-        "feature_suggestions": [
-            "Oversized cropped shirt",
-            "Wide-leg coordinated shorts",
-            "Utility pocket detailing",
-            "Lightweight layered styling"
+        "design_name": f"{season} {style} Edit",
+        "concept": f"A {season.lower()}-ready {style.lower()} outfit concept tailored for {demographic.lower()} shoppers, balancing trend-forward styling, practical comfort, and easy commercial production.",
+        "colors": ["Powder Blue", "Soft White", "Stone Beige"],
+        "fabrics": FABRIC_GUIDE[season][:2],
+        "size_recommendation": SIZE_GUIDE[demographic],
+        "production_feasibility": "High feasibility with low-to-medium construction complexity and locally sourceable materials.",
+        "target_demographic": f"{demographic} fashion shoppers",
+        "suggested_features": FEATURE_SUGGESTIONS[season],
+        "style_notes": [
+            "Keep the silhouette clean and camera-friendly for social media appeal.",
+            "Use contrast between base neutral tones and one soft statement shade.",
+            "Balance comfort, repeat wearability, and trend relevance."
         ],
-        "debug_error": "Demo mode active"
+        "debug_error": "Demo mode active - add GROQ_API_KEY in Streamlit secrets to enable live AI generation."
     }
 
-def generate_reference_images(season, style, demographic, gender):
-    queries = [
-        f"{season} {style} {gender} outfit",
-        f"{demographic} {style} fashion outfit",
-        f"{season} street style outfit photo"
-    ]
 
+def generate_outfit_reference_images(season: str, style: str, demographic: str, gender: str) -> List[Dict[str, str]]:
+    queries = [
+        f"{season.lower()} {style.lower()} outfit {gender.lower()} fashion",
+        f"{demographic.lower()} street style outfit photography",
+        f"editorial fashion outfit full body {style.lower()} look"
+    ]
     refs = []
     for q in queries:
         encoded = urllib.parse.quote(q)
         refs.append({
-            "url": f"https://source.unsplash.com/900x700/?{encoded}",
+            "url": f"https://source.unsplash.com/featured/1200x900/?{encoded}",
             "caption": q.title()
         })
     return refs
 
-def generate_design(prompt):
+
+def generate_design(prompt: str, prompt_inputs: Dict[str, str]) -> Dict:
     if not GROQ_API_KEY:
-        return demo_result()
+        return demo_result(prompt_inputs)
 
     api_url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -370,9 +271,8 @@ def generate_design(prompt):
     }
 
     system_message = """
-You are a professional fashion intelligence assistant.
-Return only valid JSON.
-Use this exact schema:
+You are a professional fashion intelligence assistant for a hackathon demo app.
+Return only valid JSON with this exact schema:
 {
   "design_name": "string",
   "concept": "string",
@@ -381,8 +281,14 @@ Use this exact schema:
   "size_recommendation": "string",
   "production_feasibility": "string",
   "target_demographic": "string",
-  "feature_suggestions": ["string", "string", "string", "string"]
+  "suggested_features": ["string", "string", "string"],
+  "style_notes": ["string", "string", "string"]
 }
+Rules:
+- Keep concept under 90 words.
+- Suggested features must be realistic fashion product features, not software features.
+- Colors and fabrics must be production-friendly.
+- Output JSON only.
 """
 
     payload = {
@@ -398,38 +304,35 @@ Use this exact schema:
     try:
         response = requests.post(api_url, headers=headers, json=payload, timeout=60)
         result = response.json()
-
         if response.status_code != 200:
-            data = demo_result()
+            data = demo_result(prompt_inputs)
             data["debug_error"] = f"HTTP {response.status_code}: {result}"
             return data
 
         content = result["choices"][0]["message"]["content"]
         parsed = json.loads(content)
-
-        parsed["debug_error"] = "Success"
+        parsed["debug_error"] = "Success - Groq JSON mode"
         return parsed
-
     except Exception as e:
-        data = demo_result()
-        data["debug_error"] = str(e)
+        data = demo_result(prompt_inputs)
+        data["debug_error"] = f"Groq fallback triggered: {str(e)}"
         return data
+
 
 load_css()
 
 st.markdown("""
 <div class="hero-card">
-    <div class="pill-wrap">
+    <div>
         <span class="pill">AI Fashion Intelligence</span>
-        <span class="pill">Clean Main Layout</span>
+        <span class="pill">Groq JSON Mode</span>
         <span class="pill">Outfit Moodboard</span>
-        <span class="pill">Groq Powered</span>
+        <span class="pill">Hackathon Ready</span>
     </div>
     <div class="hero-title">TrendWeave AI</div>
     <div class="hero-sub">
-        A clean fashion design intelligence platform that transforms trends, demographics, regional context,
-        and seasonal inputs into original fashion concepts with fabrics, sizing guidance, production feasibility,
-        features, and outfit-photo references.
+        A fashion design intelligence platform that transforms trend, demographic, weather, and regional inputs
+        into outfit concepts with materials, color palette, sizing guidance, production feasibility, and visual references.
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -439,21 +342,21 @@ with fc1:
     st.markdown("""
     <div class="feature-card">
         <div class="feature-title">Trend Analysis</div>
-        <div class="feature-desc">Uses seasonal and audience signals to shape modern design direction.</div>
+        <div class="feature-desc">Uses seasonal and audience signals to shape commercial fashion direction.</div>
     </div>
     """, unsafe_allow_html=True)
 with fc2:
     st.markdown("""
     <div class="feature-card">
-        <div class="feature-title">AI Feature Suggestions</div>
-        <div class="feature-desc">Generates concept, colors, fabrics, outfit features, and feasibility insights.</div>
+        <div class="feature-title">AI Design Output</div>
+        <div class="feature-desc">Generates concept, color palette, fabrics, styling notes, and outfit features.</div>
     </div>
     """, unsafe_allow_html=True)
 with fc3:
     st.markdown("""
     <div class="feature-card">
         <div class="feature-title">Outfit Moodboard</div>
-        <div class="feature-desc">Shows outfit-style reference photos instead of generic random placeholders.</div>
+        <div class="feature-desc">Shows reference imagery focused on real outfit photography rather than random placeholders.</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -479,6 +382,8 @@ with st.form("fashion_form"):
 
     generate = st.form_submit_button("Generate Fashion Design")
 
+st.markdown('</div>', unsafe_allow_html=True)
+
 weather = get_weather(region)
 temp_text = f"{weather['temperature']}°C" if weather else "Unavailable"
 wind_text = f"{weather['wind_speed']} km/h" if weather else "Unavailable"
@@ -502,35 +407,47 @@ with mc3:
     st.markdown(f"""
     <div class="metric-box">
         <div class="metric-label">AI Mode</div>
-        <div class="metric-value">{'Groq' if GROQ_API_KEY else 'Demo'}</div>
+        <div class="metric-value">{'Groq Live' if GROQ_API_KEY else 'Demo'}</div>
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 if generate:
+    prompt_inputs = {
+        "demographic": demographic,
+        "gender": gender,
+        "season": season,
+        "region": region,
+        "style": style,
+        "price_range": price_range,
+        "temp_text": temp_text,
+        "wind_text": wind_text
+    }
     prompt = f"""
-Create an original {season} {style} fashion design for {gender} targeting {demographic} in {region}.
+Create an original fashion outfit design for the following input.
+Season: {season}
+Style: {style}
+Gender segment: {gender}
+Target demographic: {demographic}
+Region: {region}
 Trend keywords: {', '.join(TREND_DATA[season])}
 Suggested fabrics: {', '.join(FABRIC_GUIDE[season])}
 Suggested sizes: {SIZE_GUIDE[demographic]}
 Price range: {price_range}
 Current weather: {temp_text}
 Wind speed: {wind_text}
-
-Also suggest 4 practical outfit features or garment details suitable for this fashion concept.
+Need: one commercially realistic outfit concept suitable for a fashion design ideation tool.
 """
+    result = generate_design(prompt, prompt_inputs)
+    refs = generate_outfit_reference_images(season, style, demographic, gender)
+    st.session_state.generated = True
+    st.session_state.result = result
+    st.session_state.refs = refs
+    st.session_state.submitted_inputs = prompt_inputs
 
-    result = generate_design(prompt)
-    refs = generate_reference_images(season, style, demographic, gender)
-
-    st.session_state.generated_result = result
-    st.session_state.generated_refs = refs
-    st.session_state.last_generated = True
-
-if st.session_state.last_generated and st.session_state.generated_result:
-    result = st.session_state.generated_result
-    refs = st.session_state.generated_refs
+if st.session_state.generated and st.session_state.result:
+    result = st.session_state.result
+    refs = st.session_state.refs
+    submitted = st.session_state.submitted_inputs
 
     st.markdown("## Generated Output")
 
@@ -542,23 +459,16 @@ if st.session_state.last_generated and st.session_state.generated_result:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(f'<div class="info-line"><b>Target Demographic:</b> {result.get("target_demographic", "N/A")}</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="info-line"><b>Size Recommendation:</b> {result.get("size_recommendation", "N/A")}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="info-line"><b>Region:</b> {submitted.get("region", "N/A")}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with o2:
         st.markdown('<div class="clean-card">', unsafe_allow_html=True)
         st.markdown('<div class="sub-title">Materials & Production</div>', unsafe_allow_html=True)
-
         colors = result.get("colors", [])
         fabrics = result.get("fabrics", [])
-        features = result.get("feature_suggestions", [])
-
-        if not isinstance(colors, list):
-            colors = [str(colors)]
-        if not isinstance(fabrics, list):
-            fabrics = [str(fabrics)]
-        if not isinstance(features, list):
-            features = [str(features)]
-
+        colors = colors if isinstance(colors, list) else [str(colors)]
+        fabrics = fabrics if isinstance(fabrics, list) else [str(fabrics)]
         st.markdown("**Color Palette**")
         st.markdown("".join([f'<span class="badge">{c}</span>' for c in colors]), unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -571,22 +481,21 @@ if st.session_state.last_generated and st.session_state.generated_result:
     ti1, ti2, ti3 = st.columns(3, gap="large")
     with ti1:
         st.markdown('<div class="clean-card">', unsafe_allow_html=True)
-        st.markdown('<div class="sub-title">Trend Keywords</div>', unsafe_allow_html=True)
-        st.markdown("".join([f'<span class="badge">{item}</span>' for item in TREND_DATA[season]]), unsafe_allow_html=True)
+        st.markdown('<div class="sub-title">Suggested Outfit Features</div>', unsafe_allow_html=True)
+        st.markdown("".join([f'<span class="badge">{item}</span>' for item in result.get("suggested_features", [])]), unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-
     with ti2:
         st.markdown('<div class="clean-card">', unsafe_allow_html=True)
-        st.markdown('<div class="sub-title">AI Feature Suggestions</div>', unsafe_allow_html=True)
-        st.markdown("".join([f'<span class="badge">{item}</span>' for item in features]), unsafe_allow_html=True)
+        st.markdown('<div class="sub-title">Styling Notes</div>', unsafe_allow_html=True)
+        for note in result.get("style_notes", []):
+            st.markdown(f'- {note}')
         st.markdown('</div>', unsafe_allow_html=True)
-
     with ti3:
         st.markdown('<div class="clean-card">', unsafe_allow_html=True)
         st.markdown('<div class="sub-title">Weather Context</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="info-line"><b>Region:</b> {region}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="info-line"><b>Temperature:</b> {temp_text}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="info-line"><b>Wind Speed:</b> {wind_text}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="info-line"><b>Season:</b> {submitted.get("season", "N/A")}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="info-line"><b>Temperature:</b> {submitted.get("temp_text", "N/A")}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="info-line"><b>Wind Speed:</b> {submitted.get("wind_text", "N/A")}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("## Reference Moodboard")
@@ -594,7 +503,7 @@ if st.session_state.last_generated and st.session_state.generated_result:
     for col, item in zip([im1, im2, im3], refs):
         with col:
             st.markdown('<div class="image-card">', unsafe_allow_html=True)
-            st.image(item["url"], use_container_width=True)
+            st.image(item["url"], width="stretch")
             st.markdown(f'<div class="image-caption">{item["caption"]}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -602,8 +511,7 @@ if st.session_state.last_generated and st.session_state.generated_result:
     st.markdown('<div class="clean-card">', unsafe_allow_html=True)
     st.markdown(f'<div class="debug-box">{result.get("debug_error", "No debug message")}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-
 else:
     pv1, pv2, pv3 = st.columns(3, gap="large")
     with pv1:
-        st.markdown('<div cla
+        st.markdo
