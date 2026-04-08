@@ -620,4 +620,135 @@ if st.session_state.last_error:
 if st.session_state.generated and st.session_state.result:
     result = st.session_state.result
     refs = st.session_state.refs
-    submitt
+    submitted = st.session_state.submitted_inputs
+
+    st.markdown("## Generated Output")
+
+    left, right = st.columns(2, gap="medium")
+
+    with left:
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="design-title">{safe_str(result.get("design_name"))}</div>
+                <div class="muted-text">{safe_str(result.get("concept"))}</div>
+                <br>
+                <div class="info-item"><b>Target Demographic:</b> {safe_str(result.get("target_demographic"))}</div>
+                <div class="info-item"><b>Size Recommendation:</b> {safe_str(result.get("size_recommendation"))}</div>
+                <div class="info-item"><b>Region:</b> {safe_str(submitted.get("region"))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with right:
+        colors = result.get("colors", [])
+        fabrics = result.get("fabrics", [])
+
+        if not isinstance(colors, list):
+            colors = [safe_str(colors)]
+        if not isinstance(fabrics, list):
+            fabrics = [safe_str(fabrics)]
+
+        color_badges = "".join(f'<span class="badge">{safe_str(c)}</span>' for c in colors)
+        fabric_badges = "".join(f'<span class="badge">{safe_str(f)}</span>' for f in fabrics)
+
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Materials & Production</div>
+                <div class="info-item"><b>Color Palette</b></div>
+                <div>{color_badges}</div>
+                <br>
+                <div class="info-item"><b>Fabric Suggestions</b></div>
+                <div>{fabric_badges}</div>
+                <br>
+                <div class="info-item"><b>Production Feasibility:</b> {safe_str(result.get("production_feasibility"))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    s1, s2, s3 = st.columns(3, gap="medium")
+
+    with s1:
+        feature_badges = "".join(
+            f'<span class="badge">{safe_str(item)}</span>'
+            for item in result.get("suggested_features", [])
+        )
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Suggested Features</div>
+                <div>{feature_badges}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with s2:
+        notes_html = "".join(
+            f"<div class='info-item'>• {safe_str(note)}</div>"
+            for note in result.get("style_notes", [])
+        )
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Styling Notes</div>
+                {notes_html}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with s3:
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="section-title">Weather Context</div>
+                <div class="info-item"><b>Season:</b> {safe_str(submitted.get("season"))}</div>
+                <div class="info-item"><b>Temperature:</b> {safe_str(submitted.get("temp_text"))}</div>
+                <div class="info-item"><b>Wind Speed:</b> {safe_str(submitted.get("wind_text"))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown("## Reference Moodboard")
+    i1, i2, i3 = st.columns(3, gap="medium")
+
+    for col, item in zip([i1, i2, i3], refs):
+        with col:
+            st.markdown('<div class="image-card">', unsafe_allow_html=True)
+            st.image(item["url"], use_container_width=True)
+            st.markdown(
+                f'<div class="image-caption">{safe_str(item["caption"])}</div>',
+                unsafe_allow_html=True
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("## System Status")
+    st.markdown(
+        f'<div class="status-box">{safe_str(result.get("system_status", "No status message"))}</div>',
+        unsafe_allow_html=True
+    )
+
+else:
+    st.markdown("## Preview")
+    p1, p2, p3 = st.columns(3, gap="medium")
+
+    with p1:
+        preview_card(
+            "Trend-Aware Design",
+            "Seasonal trends, target demographic, and style preference are combined to generate outfit concepts that feel current, wearable, and commercially realistic."
+        )
+    with p2:
+        preview_card(
+            "Weather Context",
+            "Regional weather information helps shape fabric choices, comfort direction, and practical styling suggestions for more relevant design output."
+        )
+    with p3:
+        preview_card(
+            "Production Guidance",
+            "The app suggests feasible materials, fit ranges, and realistic fashion product features so the output stays useful for ideation, demos, and early planning."
+        )
