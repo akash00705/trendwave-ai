@@ -1,8 +1,10 @@
-import streamlit as st
-import requests
 import json
 import urllib.parse
 from typing import Dict, List, Optional
+
+import requests
+import streamlit as st
+
 
 st.set_page_config(
     page_title="TrendWeave AI",
@@ -48,284 +50,287 @@ FEATURE_SUGGESTIONS = {
 
 STYLE_GUIDE = {
     "Streetwear": [
-        "Relaxed silhouette with trend-led layering",
-        "Strong visual appeal for social-first styling",
-        "Commercially versatile everyday statement look"
+        "Keep the silhouette relaxed and youth-oriented.",
+        "Use neutral base tones with one standout accent.",
+        "Balance trend appeal with repeat wearability."
     ],
     "Minimal": [
-        "Clean lines and controlled palette",
-        "Refined silhouettes with subtle detailing",
-        "Quiet luxury feel at accessible production level"
+        "Focus on clean lines and restrained detailing.",
+        "Use a tight, refined color palette.",
+        "Prioritize wearable elegance over heavy ornamentation."
     ],
     "Casual": [
-        "Comfort-driven wardrobe essential",
-        "Easy repeat wear and broad commercial appeal",
-        "Low-risk, mass-friendly styling direction"
+        "Maintain comfort-first fit balance.",
+        "Choose easy-care materials and versatile colors.",
+        "Keep the overall shape simple and approachable."
     ],
     "Ethnic Fusion": [
-        "Modern silhouette with cultural styling cues",
-        "Contemporary fabric pairing with traditional influence",
-        "Festive-ready while still wearable for everyday occasions"
+        "Blend contemporary shape with cultural accents.",
+        "Use texture or trim as the hero detail.",
+        "Keep the final look festive but practical."
     ],
     "Formal": [
-        "Sharp structure with polished detailing",
-        "Professional and occasion-ready fit direction",
-        "Elevated styling with durable material choices"
+        "Use crisp structure and polished finishing.",
+        "Keep proportions sharp and market friendly.",
+        "Elevate the look through fabric and tailoring clarity."
     ]
 }
 
-if "generated" not in st.session_state:
-    st.session_state.generated = False
-if "result" not in st.session_state:
-    st.session_state.result = None
-if "refs" not in st.session_state:
-    st.session_state.refs = []
-if "submitted_inputs" not in st.session_state:
-    st.session_state.submitted_inputs = {}
+
+def init_state():
+    defaults = {
+        "generated": False,
+        "result": None,
+        "refs": [],
+        "submitted_inputs": {}
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+def safe_str(value, default="N/A"):
+    if value is None:
+        return default
+    return str(value)
 
 
 def load_css():
-    css = """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
 
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
+        html, body, [class*="css"] {
+            font-family: 'Inter', sans-serif;
+        }
 
-    .stApp {
-        background: linear-gradient(180deg, #0b1120 0%, #111827 100%);
-        color: #f8fafc;
-    }
+        .stApp {
+            background: linear-gradient(180deg, #0b1120 0%, #111827 100%);
+            color: #f8fafc;
+        }
 
-    .block-container {
-        max-width: 1180px;
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
-    }
+        .block-container {
+            max-width: 1180px;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+            padding-left: 2rem;
+            padding-right: 2rem;
+        }
 
-    section[data-testid="stSidebar"] {
-        display: none;
-    }
+        section[data-testid="stSidebar"] {
+            display: none;
+        }
 
-    .main-shell {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 24px;
-        padding: 2rem;
-        margin-bottom: 1.5rem;
-        backdrop-filter: blur(10px);
-    }
+        .main-shell {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 24px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
 
-    .hero-title {
-        font-size: 2.3rem;
-        font-weight: 800;
-        color: #ffffff;
-        margin-bottom: 0.35rem;
-        text-align: center;
-        letter-spacing: -0.02em;
-    }
+        .hero-title {
+            font-size: 2.3rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 0.35rem;
+            text-align: center;
+            letter-spacing: -0.02em;
+        }
 
-    .hero-subtitle {
-        text-align: center;
-        font-size: 1rem;
-        color: rgba(226,232,240,0.78);
-        max-width: 760px;
-        margin: 0 auto 1.75rem auto;
-        line-height: 1.7;
-    }
+        .hero-subtitle {
+            text-align: center;
+            font-size: 1rem;
+            color: rgba(226,232,240,0.78);
+            max-width: 760px;
+            margin: 0 auto 1.75rem auto;
+            line-height: 1.7;
+        }
 
-    .section-card {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 20px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-    }
+        .section-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
 
-    .result-card {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 20px;
-        padding: 1.35rem;
-        height: 100%;
-        backdrop-filter: blur(8px);
-    }
+        .result-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            padding: 1.35rem;
+            height: 100%;
+        }
 
-    .section-title {
-        font-size: 1rem;
-        font-weight: 700;
-        color: #ffffff;
-        margin-bottom: 1rem;
-    }
+        .section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 1rem;
+        }
 
-    .design-title {
-        font-size: 1.4rem;
-        font-weight: 800;
-        color: #ffffff;
-        margin-bottom: 0.75rem;
-    }
+        .design-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 0.75rem;
+        }
 
-    .muted-text {
-        color: rgba(226,232,240,0.80);
-        line-height: 1.75;
-        font-size: 0.97rem;
-    }
+        .muted-text {
+            color: rgba(226,232,240,0.80);
+            line-height: 1.75;
+            font-size: 0.97rem;
+        }
 
-    .info-item {
-        color: rgba(226,232,240,0.84);
-        line-height: 1.8;
-        font-size: 0.95rem;
-        margin-bottom: 0.35rem;
-    }
+        .info-item {
+            color: rgba(226,232,240,0.84);
+            line-height: 1.8;
+            font-size: 0.95rem;
+            margin-bottom: 0.35rem;
+        }
 
-    .badge-wrap {
-        margin-top: 0.35rem;
-    }
+        .badge-wrap {
+            margin-top: 0.35rem;
+        }
 
-    .badge {
-        display: inline-block;
-        padding: 0.42rem 0.8rem;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.10);
-        color: #e2e8f0;
-        font-size: 0.82rem;
-        font-weight: 600;
-        margin: 0.2rem 0.28rem 0.2rem 0;
-    }
+        .badge {
+            display: inline-block;
+            padding: 0.42rem 0.8rem;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.10);
+            color: #e2e8f0;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin: 0.2rem 0.28rem 0.2rem 0;
+        }
 
-    .metric-card {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.07);
-        border-radius: 18px;
-        padding: 1rem;
-        text-align: center;
-        height: 100%;
-    }
+        .metric-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 18px;
+            padding: 1rem;
+            text-align: center;
+            height: 100%;
+        }
 
-    .metric-label {
-        color: rgba(226,232,240,0.66);
-        font-size: 0.8rem;
-        margin-bottom: 0.3rem;
-    }
+        .metric-label {
+            color: rgba(226,232,240,0.66);
+            font-size: 0.8rem;
+            margin-bottom: 0.3rem;
+        }
 
-    .metric-value {
-        color: #ffffff;
-        font-size: 1rem;
-        font-weight: 700;
-    }
+        .metric-value {
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 700;
+        }
 
-    .preview-card {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 18px;
-        padding: 1.2rem;
-        min-height: 180px;
-        height: 100%;
-    }
+        .preview-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 18px;
+            padding: 1.2rem;
+            min-height: 170px;
+            height: 100%;
+        }
 
-    .preview-title {
-        color: #ffffff;
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: 0.65rem;
-    }
+        .preview-title {
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.65rem;
+        }
 
-    .preview-text {
-        color: rgba(226,232,240,0.80);
-        line-height: 1.7;
-        font-size: 0.94rem;
-    }
+        .preview-text {
+            color: rgba(226,232,240,0.80);
+            line-height: 1.7;
+            font-size: 0.94rem;
+        }
 
-    .image-card {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 18px;
-        padding: 0.8rem;
-        height: 100%;
-    }
+        .image-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 18px;
+            padding: 0.8rem;
+            height: 100%;
+        }
 
-    .image-caption {
-        color: rgba(226,232,240,0.78);
-        text-align: center;
-        font-size: 0.88rem;
-        margin-top: 0.75rem;
-    }
+        .image-caption {
+            color: rgba(226,232,240,0.78);
+            text-align: center;
+            font-size: 0.88rem;
+            margin-top: 0.75rem;
+        }
 
-    .status-box {
-        background: rgba(15, 23, 42, 0.78);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 16px;
-        padding: 1rem;
-        color: #cbd5e1;
-        font-family: monospace;
-        font-size: 0.86rem;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
+        .status-box {
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 1rem;
+            color: #cbd5e1;
+            font-family: monospace;
+            font-size: 0.86rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
 
-    div[data-baseweb="input"] > div,
-    div[data-baseweb="select"] > div,
-    .stTextInput > div > div,
-    .stSelectbox > div > div {
-        background: rgba(255,255,255,0.06) !important;
-        border: 1px solid rgba(255,255,255,0.10) !important;
-        border-radius: 14px !important;
-        min-height: 48px;
-    }
+        .small-note {
+            color: rgba(226,232,240,0.70);
+            font-size: 0.88rem;
+            margin-bottom: 0.75rem;
+        }
 
-    input, textarea, [data-baseweb="input"] input {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        caret-color: #ffffff !important;
-        font-size: 15px !important;
-    }
+        div[data-baseweb="input"] > div,
+        div[data-baseweb="select"] > div,
+        .stTextInput > div > div,
+        .stSelectbox > div > div {
+            background: rgba(255,255,255,0.06) !important;
+            border: 1px solid rgba(255,255,255,0.10) !important;
+            border-radius: 14px !important;
+            min-height: 48px;
+        }
 
-    .stButton > button,
-    .stFormSubmitButton > button {
-        width: 100%;
-        border-radius: 14px;
-        padding: 0.8rem 1rem;
-        font-size: 1rem;
-        font-weight: 700;
-        border: none;
-        background: #2563eb;
-        color: #ffffff;
-        box-shadow: none;
-    }
+        input, textarea, [data-baseweb="input"] input {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            caret-color: #ffffff !important;
+            font-size: 15px !important;
+        }
 
-    .stButton > button:hover,
-    .stFormSubmitButton > button:hover {
-        background: #1d4ed8;
-    }
+        .stButton > button,
+        .stFormSubmitButton > button {
+            width: 100%;
+            border-radius: 14px;
+            padding: 0.8rem 1rem;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            background: #2563eb;
+            color: #ffffff;
+            box-shadow: none;
+        }
 
-    h2, h3 {
-        color: #ffffff;
-        margin-top: 0.6rem;
-        margin-bottom: 0.85rem;
-    }
+        .stButton > button:hover,
+        .stFormSubmitButton > button:hover {
+            background: #1d4ed8;
+        }
 
-    .small-note {
-        color: rgba(226,232,240,0.70);
-        font-size: 0.88rem;
-        margin-top: 0.35rem;
-    }
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
-
-
-def safe_str(value) -> str:
-    if value is None:
-        return "N/A"
-    return str(value)
+        h2, h3 {
+            color: #ffffff;
+            margin-top: 0.6rem;
+            margin-bottom: 0.85rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 def get_weather(city: str) -> Optional[Dict[str, str]]:
@@ -347,14 +352,14 @@ def get_weather(city: str) -> Optional[Dict[str, str]]:
         )
         weather_res = requests.get(weather_url, timeout=20)
         weather_res.raise_for_status()
-        current = weather_res.json().get("current", {})
 
-        temperature = current.get("temperature_2m")
-        wind_speed = current.get("wind_speed_10m")
+        current = weather_res.json().get("current", {})
+        temperature = current.get("temperature_2m", "N/A")
+        wind_speed = current.get("wind_speed_10m", "N/A")
 
         return {
-            "temperature": safe_str(temperature) if temperature is not None else "N/A",
-            "wind_speed": safe_str(wind_speed) if wind_speed is not None else "N/A"
+            "temperature": safe_str(temperature),
+            "wind_speed": safe_str(wind_speed)
         }
     except Exception:
         return None
@@ -364,13 +369,11 @@ def demo_result(prompt_inputs: Dict[str, str]) -> Dict:
     season = prompt_inputs.get("season", "Summer")
     style = prompt_inputs.get("style", "Streetwear")
     demographic = prompt_inputs.get("demographic", "Gen Z")
-    price_range = prompt_inputs.get("price_range", "Mid-range")
     gender = prompt_inputs.get("gender", "Unisex")
+    price_range = prompt_inputs.get("price_range", "Mid-range")
     region = prompt_inputs.get("region", "Coimbatore")
 
-    style_notes = STYLE_GUIDE.get(style, STYLE_GUIDE["Casual"])
-
-    palette_map = {
+    color_map = {
         "Summer": ["Powder Blue", "Soft White", "Stone Beige"],
         "Winter": ["Olive Brown", "Charcoal", "Warm Sand"],
         "Spring": ["Mint Grey", "Soft Peach", "Cloud White"],
@@ -380,35 +383,19 @@ def demo_result(prompt_inputs: Dict[str, str]) -> Dict:
     return {
         "design_name": f"{season} {style} Edit",
         "concept": (
-            f"A {season.lower()}-ready {style.lower()} outfit concept for {demographic.lower()} "
-            f"{gender.lower()} shoppers in {region}, balancing trend relevance, comfort, "
-            f"and {price_range.lower()} market practicality."
+            f"A {season.lower()}-ready {style.lower()} outfit concept tailored for "
+            f"{demographic.lower()} {gender.lower()} shoppers in {region}, balancing "
+            f"trend-forward styling, comfort, and {price_range.lower()} market realism."
         ),
-        "colors": palette_map.get(season, ["Soft White", "Stone Beige", "Slate"]),
+        "colors": color_map.get(season, ["Powder Blue", "Soft White", "Stone Beige"]),
         "fabrics": FABRIC_GUIDE.get(season, ["Cotton", "Linen"])[:2],
-        "size_recommendation": SIZE_GUIDE.get(demographic, "S to XL with balanced fits"),
+        "size_recommendation": SIZE_GUIDE.get(demographic, "S to XL with structured regular fits"),
         "production_feasibility": "High feasibility with low-to-medium construction complexity and locally sourceable materials.",
         "target_demographic": f"{demographic} fashion shoppers",
         "suggested_features": FEATURE_SUGGESTIONS.get(season, FEATURE_SUGGESTIONS["Summer"]),
-        "style_notes": style_notes,
+        "style_notes": STYLE_GUIDE.get(style, STYLE_GUIDE["Casual"]),
         "system_status": "Demo mode active - add GROQ_API_KEY in Streamlit secrets to enable live AI generation."
     }
-
-
-def generate_outfit_reference_images(season: str, style: str, demographic: str, gender: str) -> List[Dict[str, str]]:
-    queries = [
-        f"{season.lower()} {style.lower()} outfit {gender.lower()} fashion",
-        f"{demographic.lower()} fashion outfit inspiration",
-        f"editorial {style.lower()} fashion full body"
-    ]
-
-    refs = []
-    for i, q in enumerate(queries, start=1):
-        refs.append({
-            "url": f"https://picsum.photos/seed/trendweave-fashion-{urllib.parse.quote(q)}/{900}/{700}",
-            "caption": q.title()
-        })
-    return refs
 
 
 def normalize_ai_result(parsed: Dict, prompt_inputs: Dict[str, str]) -> Dict:
@@ -427,14 +414,9 @@ def normalize_ai_result(parsed: Dict, prompt_inputs: Dict[str, str]) -> Dict:
         "system_status": "Success - Groq JSON mode"
     }
 
-    if not isinstance(result["colors"], list):
-        result["colors"] = [safe_str(result["colors"])]
-    if not isinstance(result["fabrics"], list):
-        result["fabrics"] = [safe_str(result["fabrics"])]
-    if not isinstance(result["suggested_features"], list):
-        result["suggested_features"] = [safe_str(result["suggested_features"])]
-    if not isinstance(result["style_notes"], list):
-        result["style_notes"] = [safe_str(result["style_notes"])]
+    for key in ["colors", "fabrics", "suggested_features", "style_notes"]:
+        if not isinstance(result[key], list):
+            result[key] = [safe_str(result[key])]
 
     result["colors"] = [safe_str(x) for x in result["colors"]][:3]
     result["fabrics"] = [safe_str(x) for x in result["fabrics"]][:2]
@@ -491,8 +473,8 @@ Rules:
         if response.status_code != 200:
             data = demo_result(prompt_inputs)
             try:
-                result = response.json()
-                data["system_status"] = f"Groq fallback triggered - HTTP {response.status_code}: {result}"
+                err = response.json()
+                data["system_status"] = f"Groq fallback triggered - HTTP {response.status_code}: {err}"
             except Exception:
                 data["system_status"] = f"Groq fallback triggered - HTTP {response.status_code}"
             return data
@@ -508,6 +490,53 @@ Rules:
         return data
 
 
+def generate_outfit_reference_images(season: str, style: str, demographic: str, gender: str) -> List[Dict[str, str]]:
+    queries = [
+        f"{season.lower()}-{style.lower()}-{gender.lower()}-fashion",
+        f"{demographic.lower()}-fashion-inspiration",
+        f"editorial-{style.lower()}-full-body"
+    ]
+
+    refs = []
+    for i, q in enumerate(queries, start=1):
+        refs.append({
+            "url": f"https://picsum.photos/seed/{urllib.parse.quote(q)}/900/700",
+            "caption": q.replace("-", " ").title()
+        })
+    return refs
+
+
+def render_metric_card(label: str, value: str):
+    html = """
+    <div class="metric-card">
+        <div class="metric-label">{label}</div>
+        <div class="metric-value">{value}</div>
+    </div>
+    """.format(label=label, value=value)
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_preview_card(title: str, text: str):
+    html = """
+    <div class="preview-card">
+        <div class="preview-title">{title}</div>
+        <div class="preview-text">{text}</div>
+    </div>
+    """.format(title=title, text=text)
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_result_card(title: str, body_html: str):
+    html = """
+    <div class="result-card">
+        <div class="section-title">{title}</div>
+        {body_html}
+    </div>
+    """.format(title=title, body_html=body_html)
+    st.markdown(html, unsafe_allow_html=True)
+
+
+init_state()
 load_css()
 
 st.markdown(
@@ -547,45 +576,20 @@ with st.form("fashion_form"):
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-weather = get_weather(region.strip()) if region.strip() else None
+clean_region = region.strip() if region.strip() else "Coimbatore"
+weather = get_weather(clean_region)
 temp_text = f"{weather['temperature']}°C" if weather else "Unavailable"
 wind_text = f"{weather['wind_speed']} km/h" if weather else "Unavailable"
 
 m1, m2, m3 = st.columns(3, gap="medium")
 with m1:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">Selected Season</div>
-            <div class="metric-value">{season}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    render_metric_card("Selected Season", season)
 with m2:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">Temperature Context</div>
-            <div class="metric-value">{temp_text}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    render_metric_card("Temperature Context", temp_text)
 with m3:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">AI Mode</div>
-            <div class="metric-value">{'Groq Live' if GROQ_API_KEY else 'Demo'}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    render_metric_card("AI Mode", "Groq Live" if GROQ_API_KEY else "Demo")
 
 if generate:
-    clean_region = region.strip() if region.strip() else "Coimbatore"
-
     prompt_inputs = {
         "demographic": demographic,
         "gender": gender,
@@ -615,23 +619,4 @@ Need: one commercially realistic outfit concept suitable for a fashion design id
 
     with st.spinner("Generating fashion concept..."):
         result = generate_design(prompt, prompt_inputs)
-        refs = generate_outfit_reference_images(season, style, demographic, gender)
-
-    st.session_state.generated = True
-    st.session_state.result = result
-    st.session_state.refs = refs
-    st.session_state.submitted_inputs = prompt_inputs
-
-if st.session_state.generated and st.session_state.result:
-    result = st.session_state.result
-    refs = st.session_state.refs
-    submitted = st.session_state.submitted_inputs
-
-    st.markdown("## Generated Output")
-
-    left, right = st.columns(2, gap="medium")
-
-    with left:
-        st.markdown(
-            f"""
-            <div c
+       
